@@ -45,7 +45,7 @@ export GPG_TTY=$(tty)
 PORT=${PORT:-1234}
 
 # subpackages to be released
-SUBPKGS=${SUBPKGS:-"acme certbot-apache certbot-nginx letshelp-certbot letsencrypt letsencrypt-apache letsencrypt-nginx letshelp-letsencrypt"}
+SUBPKGS=${SUBPKGS:-"acme certbot-apache certbot-nginx"}
 subpkgs_modules="$(echo $SUBPKGS | sed s/-/_/g)"
 # certbot_compatibility_test is not packaged because:
 # - it is not meant to be used by anyone else than Certbot devs
@@ -145,6 +145,9 @@ pip install \
 kill $!
 cd ~-
 
+# get a snapshot of the CLI help for the docs
+certbot --help all > docs/cli-help.txt
+
 # freeze before installing anything else, so that we know end-user KGS
 # make sure "twine upload" doesn't catch "kgs"
 if [ -d ../kgs ] ; then
@@ -159,15 +162,15 @@ for module in certbot $subpkgs_modules ; do
     echo testing $module
     nosetests $module
 done
-deactivate
 
 # pin pip hashes of the things we just built
-for pkg in acme certbot certbot-apache letsencrypt letsencrypt-apache ; do
+for pkg in acme certbot certbot-apache ; do
     echo $pkg==$version \\
     pip hash dist."$version/$pkg"/*.{whl,gz} | grep "^--hash" | python2 -c 'from sys import stdin; input = stdin.read(); print "   ", input.replace("\n--hash", " \\\n    --hash"),'
 done > /tmp/hashes.$$
+deactivate
 
-if ! wc -l /tmp/hashes.$$ | grep -qE "^\s*15 " ; then
+if ! wc -l /tmp/hashes.$$ | grep -qE "^\s*9 " ; then
     echo Unexpected pip hash output
     exit 1
 fi
@@ -197,7 +200,7 @@ mv letsencrypt-auto-source/letsencrypt-auto.asc letsencrypt-auto-source/certbot-
 cp -p letsencrypt-auto-source/letsencrypt-auto certbot-auto
 cp -p letsencrypt-auto-source/letsencrypt-auto letsencrypt-auto
 
-git add certbot-auto letsencrypt-auto letsencrypt-auto-source
+git add certbot-auto letsencrypt-auto letsencrypt-auto-source docs/cli-help.txt
 git diff --cached
 git commit --gpg-sign="$RELEASE_GPG_KEY" -m "Release $version"
 git tag --local-user "$RELEASE_GPG_KEY" --sign --message "Release $version" "$tag"
